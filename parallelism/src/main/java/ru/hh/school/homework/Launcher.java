@@ -20,99 +20,99 @@ import static java.util.stream.Collectors.*;
 
 // 9000 ms in one thread and 400 ms using CachedThreadPool
 public class Launcher {
-  static ExecutorService executorService = Executors.newCachedThreadPool();
-  public static void main(String[] args) throws IOException, InterruptedException {
-    // Написать код, который, как можно более параллельно:
-    // - по заданному пути найдет все "*.java" файлы
-    // - для каждого файла вычислит 10 самых популярных слов (см. #naiveCount())
-    // - соберет top 10 для каждой папки в которой есть хотя-бы один java файл
-    // - для каждого слова сходит в гугл и вернет количество результатов по нему (см. #naiveSearch())
-    // - распечатает в консоль результаты в виде:
-    // <папка1> - <слово #1> - <кол-во результатов в гугле>
-    // <папка1> - <слово #2> - <кол-во результатов в гугле>
-    // ...
-    // <папка1> - <слово #10> - <кол-во результатов в гугле>
-    // <папка2> - <слово #1> - <кол-во результатов в гугле>
-    // <папка2> - <слово #2> - <кол-во результатов в гугле>
-    // ...
-    // <папка2> - <слово #10> - <кол-во результатов в гугле>
-    // ...
-    //
-    // Порядок результатов в консоли не обязательный.
-    // При желании naiveSearch и naiveCount можно оптимизировать.
-    
-    long start = currentTimeMillis();
-    Path rootDirPath = Path.of("d:\\projects\\work\\hh-school\\concurrency\\src");
-    //Path rootDirPath = Path.of("E:\\GSG\\GRI\\frontend\\src\\");
-    try (Stream<Path> stream = Files.walk(rootDirPath)) {
-      Stream<Path> directoryStream = stream.filter(Files::isDirectory);
-      long directorySearchDuration = currentTimeMillis() - start;
-      System.out.printf("Directory search is completed in %d ms\r\n", directorySearchDuration);
-      directoryStream
-              .forEach(file -> {
-                try {
-                  directoryCount(file);
-                } catch (InterruptedException e) {
-                  throw new RuntimeException(e);
-                }
-              });
+    static ExecutorService executorService = Executors.newCachedThreadPool();
+    public static void main(String[] args) throws IOException, InterruptedException {
+        // РќР°РїРёСЃР°С‚СЊ РєРѕРґ, РєРѕС‚РѕСЂС‹Р№, РєР°Рє РјРѕР¶РЅРѕ Р±РѕР»РµРµ РїР°СЂР°Р»Р»РµР»СЊРЅРѕ:
+        // - РїРѕ Р·Р°РґР°РЅРЅРѕРјСѓ РїСѓС‚Рё РЅР°Р№РґРµС‚ РІСЃРµ "*.java" С„Р°Р№Р»С‹
+        // - РґР»СЏ РєР°Р¶РґРѕРіРѕ С„Р°Р№Р»Р° РІС‹С‡РёСЃР»РёС‚ 10 СЃР°РјС‹С… РїРѕРїСѓР»СЏСЂРЅС‹С… СЃР»РѕРІ (СЃРј. #naiveCount())
+        // - СЃРѕР±РµСЂРµС‚ top 10 РґР»СЏ РєР°Р¶РґРѕР№ РїР°РїРєРё РІ РєРѕС‚РѕСЂРѕР№ РµСЃС‚СЊ С…РѕС‚СЏ-Р±С‹ РѕРґРёРЅ java С„Р°Р№Р»
+        // - РґР»СЏ РєР°Р¶РґРѕРіРѕ СЃР»РѕРІР° СЃС…РѕРґРёС‚ РІ РіСѓРіР» Рё РІРµСЂРЅРµС‚ РєРѕР»РёС‡РµСЃС‚РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РїРѕ РЅРµРјСѓ (СЃРј. #naiveSearch())
+        // - СЂР°СЃРїРµС‡Р°С‚Р°РµС‚ РІ РєРѕРЅСЃРѕР»СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РІ РІРёРґРµ:
+        // <РїР°РїРєР°1> - <СЃР»РѕРІРѕ #1> - <РєРѕР»-РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РіСѓРіР»Рµ>
+        // <РїР°РїРєР°1> - <СЃР»РѕРІРѕ #2> - <РєРѕР»-РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РіСѓРіР»Рµ>
+        // ...
+        // <РїР°РїРєР°1> - <СЃР»РѕРІРѕ #10> - <РєРѕР»-РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РіСѓРіР»Рµ>
+        // <РїР°РїРєР°2> - <СЃР»РѕРІРѕ #1> - <РєРѕР»-РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РіСѓРіР»Рµ>
+        // <РїР°РїРєР°2> - <СЃР»РѕРІРѕ #2> - <РєРѕР»-РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РіСѓРіР»Рµ>
+        // ...
+        // <РїР°РїРєР°2> - <СЃР»РѕРІРѕ #10> - <РєРѕР»-РІРѕ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РіСѓРіР»Рµ>
+        // ...
+        //
+        // РџРѕСЂСЏРґРѕРє СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РєРѕРЅСЃРѕР»Рё РЅРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Р№.
+        // РџСЂРё Р¶РµР»Р°РЅРёРё naiveSearch Рё naiveCount РјРѕР¶РЅРѕ РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ.
+
+        long start = currentTimeMillis();
+        Path rootDirPath = Path.of("d:\\projects\\work\\hh-school\\concurrency\\src");
+        //Path rootDirPath = Path.of("E:\\GSG\\GRI\\frontend\\src\\");
+        try (Stream<Path> stream = Files.walk(rootDirPath)) {
+            Stream<Path> directoryStream = stream.filter(Files::isDirectory);
+            long directorySearchDuration = currentTimeMillis() - start;
+            System.out.printf("Directory search is completed in %d ms\r\n", directorySearchDuration);
+            directoryStream
+                    .forEach(file -> {
+                        try {
+                            directoryCount(file);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        }
+
+        executorService.shutdown();
+
+        // waits until all running tasks finish or timeout happens
+        boolean finished = executorService.awaitTermination(10000L, TimeUnit.MILLISECONDS);
+
+        if (!finished) {
+            // interrupts all running threads, still no guarantee that everything finished
+            executorService.shutdownNow();
+        }
+
+        long duration = currentTimeMillis() - start;
+        System.out.printf("The task completed in %d ms", duration);
     }
 
-    executorService.shutdown();
+    private static void directoryCount(Path path) throws InterruptedException {
+        try (Stream<Path> stream = Files.list(path)) {
 
-    // waits until all running tasks finish or timeout happens
-    boolean finished = executorService.awaitTermination(10000L, TimeUnit.MILLISECONDS);
+            Map<String, Long> result = stream
+                    .filter(Files::isRegularFile)
+                    .filter(file -> file.toString().endsWith(".java"))
+                    .map(file -> naiveCount(file))
+                    .map(Map::entrySet)
+                    .flatMap(Collection::stream)
+                    .collect(groupingBy(Entry::getKey, summarizingLong(Entry::getValue)))
+                    .entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Entry::getKey, wordCount -> wordCount.getValue().getSum()))
+                    .entrySet()
+                    .stream()
+                    .sorted(comparingByValue(reverseOrder()))
+                    .limit(10)
+                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
 
-    if (!finished) {
-      // interrupts all running threads, still no guarantee that everything finished
-      executorService.shutdownNow();
+
+            result.forEach((key, value) -> executorService.execute(new NaiveSearchTask(key, path)));
+
+        } catch (IOException e) {
+            System.out.println("It is impossible to get count value form google");
+        }
     }
 
-    long duration = currentTimeMillis() - start;
-    System.out.printf("The task completed in %d ms", duration);
-  }
-
-  private static void directoryCount(Path path) throws InterruptedException {
-    try (Stream<Path> stream = Files.list(path)) {
-
-      Map<String, Long> result = stream
-              .filter(Files::isRegularFile)
-              .filter(file -> file.toString().endsWith(".java"))
-              .map(file -> naiveCount(file))
-              .map(Map::entrySet)
-              .flatMap(Collection::stream)
-              .collect(groupingBy(Entry::getKey, summarizingLong(Entry::getValue)))
-              .entrySet()
-              .stream()
-              .collect(Collectors.toMap(Entry::getKey, wordCount -> wordCount.getValue().getSum()))
-              .entrySet()
-              .stream()
-              .sorted(comparingByValue(reverseOrder()))
-              .limit(10)
-              .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-
-
-      result.forEach((key, value) -> executorService.execute(new NaiveSearchTask(key, path)));
-
-    } catch (IOException e) {
-      System.out.println("It is impossible to get count value form google");
+    private static Map<String, Long> naiveCount(Path path) {
+        try {
+            return Files.lines(path)
+                    .flatMap(line -> Stream.of(line.split("[^a-zA-Z0-9]")))
+                    .filter(word -> word.length() > 3)
+                    .collect(groupingBy(identity(), counting()))
+                    .entrySet()
+                    .stream()
+                    .sorted(comparingByValue(reverseOrder()))
+                    .limit(10)
+                    .collect(toMap(Entry::getKey, Entry::getValue));
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
-  }
-
-  private static Map<String, Long> naiveCount(Path path) {
-    try {
-      return Files.lines(path)
-              .flatMap(line -> Stream.of(line.split("[^a-zA-Z0-9]")))
-              .filter(word -> word.length() > 3)
-              .collect(groupingBy(identity(), counting()))
-              .entrySet()
-              .stream()
-              .sorted(comparingByValue(reverseOrder()))
-              .limit(10)
-              .collect(toMap(Entry::getKey, Entry::getValue));
-    }
-    catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
 }
