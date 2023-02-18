@@ -12,9 +12,11 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toMap;
@@ -68,6 +70,8 @@ public class L5Cache {
                     });
         }
 
+        //TODO: заменить на ожидание когда закончатся СompletableFuture
+        sleepUninterruptibly(2, SECONDS);
         doubledQueries
                 .entrySet()
                 .stream()
