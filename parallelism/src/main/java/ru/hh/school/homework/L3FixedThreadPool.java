@@ -18,10 +18,13 @@ import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
 
-//400 ms
-// CachedThreadPool optimization of google count + directory analyze optimization
-public class L4LauncherCTPDirectoryTask {
-    static ExecutorService executorService = Executors.newCachedThreadPool();
+// 116613 ms sequential
+// 5173 ms cachedPool
+// 3671 - fixedThreadPool(50) and 116000 ms sequential
+public class L3FixedThreadPool {
+
+    static ExecutorService executorService = Executors.newFixedThreadPool(50);
+    //static ExecutorService executorService = ForkJoinPool.commonPool();
     public static void main(String[] args) throws IOException, InterruptedException {
         // Написать код, который, как можно более параллельно:
         // - по заданному пути найдет все "*.java" файлы
@@ -42,18 +45,15 @@ public class L4LauncherCTPDirectoryTask {
         // Порядок результатов в консоли не обязательный.
         // При желании naiveSearch и naiveCount можно оптимизировать.
 
-
-        // test our naive methods:
+        System.out.println(Runtime.getRuntime().availableProcessors());
         long start = currentTimeMillis();
-        Path rootDirPath = Path.of("d:\\projects\\work\\hh-school\\concurrency\\src");
+        Path rootDirPath = Path.of("D:\\projects\\work\\hh-school\\parallelism\\src\\main\\java\\ru\\hh\\school\\parallelism");
         //Path rootDirPath = Path.of("E:\\GSG\\GRI\\frontend\\src\\");
-        long directorySearchDuration = 0;
         try (Stream<Path> stream = Files.walk(rootDirPath)) {
             Stream<Path> directoryStream = stream.filter(Files::isDirectory);
-            directorySearchDuration = currentTimeMillis() - start;
+            long directorySearchDuration = currentTimeMillis() - start;
             System.out.printf("Directory search is completed in %d ms\r\n", directorySearchDuration);
             directoryStream
-                    .parallel()
                     .forEach(file -> {
                         try {
                             directoryCount(file);
@@ -62,11 +62,11 @@ public class L4LauncherCTPDirectoryTask {
                         }
                     });
         }
-        System.out.printf("Directory processing is completed in %d ms\r\n", currentTimeMillis() - directorySearchDuration - start);
+
         executorService.shutdown();
 
         // waits until all running tasks finish or timeout happens
-        boolean finished = executorService.awaitTermination(10000L, TimeUnit.MILLISECONDS);
+        boolean finished = executorService.awaitTermination(50000L, TimeUnit.MILLISECONDS);
 
         if (!finished) {
             // interrupts all running threads, still no guarantee that everything finished
@@ -78,7 +78,6 @@ public class L4LauncherCTPDirectoryTask {
     }
 
     private static void directoryCount(Path path) throws InterruptedException {
-        long start = currentTimeMillis();
         try (Stream<Path> stream = Files.list(path)) {
 
             Map<String, Long> result = stream
@@ -90,13 +89,13 @@ public class L4LauncherCTPDirectoryTask {
                     .collect(groupingBy(Entry::getKey, summarizingLong(Entry::getValue)))
                     .entrySet()
                     .stream()
-                    .collect(Collectors.toMap(Entry::getKey, v -> v.getValue().getSum()))
+                    .collect(Collectors.toMap(Entry::getKey, wordCount -> wordCount.getValue().getSum()))
                     .entrySet()
                     .stream()
                     .sorted(comparingByValue(reverseOrder()))
                     .limit(10)
                     .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-            System.out.printf("Directory analyze of %s is completed in %d ms\r\n", path.toString(), currentTimeMillis() - start);
+
 
             result.forEach((key, value) -> executorService.execute(new NaiveSearchTask(key, path)));
 
@@ -122,4 +121,3 @@ public class L4LauncherCTPDirectoryTask {
         }
     }
 }
-

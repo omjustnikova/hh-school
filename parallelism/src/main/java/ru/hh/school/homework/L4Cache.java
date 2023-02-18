@@ -1,5 +1,6 @@
 package ru.hh.school.homework;
 
+import ru.hh.school.homework.common.CachedNaiveSearchTask;
 import ru.hh.school.homework.common.NaiveSearchTask;
 
 import java.io.IOException;
@@ -7,8 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -17,16 +20,15 @@ import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toMap;
 
-// 9000(mock) ms in one thread and 400 ms using CachedThreadPool
-// 12000(google request) - cached - not optimzied
-// 15496
-// 16268 - fixedThreadPool(500) and 88000 ms sequential
-// 5119 -
-public class Launcher {
-    //static ExecutorService executorService = Executors.newCachedThreadPool();
+// 116613 ms sequential
+// 5173 ms cachedPool
+// 3671 - fixedThreadPool(50) and 116000 ms sequential
+public class L4Cache {
+
     static ExecutorService executorService = Executors.newFixedThreadPool(50);
-    //static ExecutorService executorService = ForkJoinPool.commonPool();
+
     public static void main(String[] args) throws IOException, InterruptedException {
         // Написать код, который, как можно более параллельно:
         // - по заданному пути найдет все "*.java" файлы
@@ -88,18 +90,18 @@ public class Launcher {
                     .map(file -> naiveCount(file))
                     .map(Map::entrySet)
                     .flatMap(Collection::stream)
-                    .collect(groupingBy(Entry::getKey, summarizingLong(Entry::getValue)))
+                    .collect(groupingBy(Map.Entry::getKey, summarizingLong(Map.Entry::getValue)))
                     .entrySet()
                     .stream()
-                    .collect(Collectors.toMap(Entry::getKey, wordCount -> wordCount.getValue().getSum()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, wordCount -> wordCount.getValue().getSum()))
                     .entrySet()
                     .stream()
                     .sorted(comparingByValue(reverseOrder()))
                     .limit(10)
-                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-
-            result.forEach((key, value) -> executorService.execute(new NaiveSearchTask(key, path)));
+            // такой кеш не работает, так как к тому времени когда из него пора брать, потоки уже сходили в гугл
+            result.forEach((key, value) -> executorService.execute(new CachedNaiveSearchTask(key, path)));
 
         } catch (IOException e) {
             System.out.println("It is impossible to get count value form google");
@@ -116,7 +118,7 @@ public class Launcher {
                     .stream()
                     .sorted(comparingByValue(reverseOrder()))
                     .limit(10)
-                    .collect(toMap(Entry::getKey, Entry::getValue));
+                    .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
         catch (IOException e) {
             throw new RuntimeException(e);

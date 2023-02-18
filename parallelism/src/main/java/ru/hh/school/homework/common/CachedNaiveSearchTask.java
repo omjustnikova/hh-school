@@ -6,32 +6,39 @@ import org.jsoup.nodes.Element;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.RecursiveTask;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class RecursiceNaiveSearchTask extends RecursiveTask {
+public class CachedNaiveSearchTask implements Runnable {
+    private static final Map<String, Long> CACHE = new ConcurrentHashMap<>();
 
     private String query;
 
     private Path directoryPath;
 
-    public RecursiceNaiveSearchTask(String query, Path directoryPath) {
-        this.query = query;
+    public CachedNaiveSearchTask(String query, Path directoryPath) {
+        this.query = query.toLowerCase();
         this.directoryPath = directoryPath;
     }
 
-    @Override
-    protected Object compute() {
+    public void run() {
         try {
             printGoogleCount();
         } catch (IOException e) {
             System.out.printf("%s - %s - %s\r\n", directoryPath, query, "It is impossible to count");
         }
-        return null;
     }
 
     private void printGoogleCount() throws IOException {
-        System.out.printf("%s - %s - %d\r\n", directoryPath, query, naiveSearchMock(query));
+        Long count = CACHE.get(query);
+        System.out.println(CACHE.size());
+        if (count == null) {
+            count = naiveSearch(query); //naiveSearchMock()
+            CACHE.put(query, count);
+            System.out.println("Cached" + CACHE.size());
+        }
+        System.out.printf("%s - %s - %d\r\n", directoryPath, query, count); //naiveSearchMock()
     }
 
     private long naiveSearch(String query) throws IOException {
@@ -46,7 +53,7 @@ public class RecursiceNaiveSearchTask extends RecursiveTask {
         return Long.parseLong(resultsPart.replaceAll("[^0-9]", ""));
     }
 
-    private static long naiveSearchMock(String query) throws IOException {
+    private long naiveSearchMock(String query) throws IOException {
         try {
             Thread.sleep(90L);
         } catch (InterruptedException e) {
@@ -54,4 +61,5 @@ public class RecursiceNaiveSearchTask extends RecursiveTask {
         }
         return ThreadLocalRandom.current().nextInt();
     }
+
 }

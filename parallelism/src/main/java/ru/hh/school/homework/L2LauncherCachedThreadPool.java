@@ -18,7 +18,8 @@ import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
 
-//400 ms
+//116613 ms sequential
+//5173 ms cachedPool
 public class L2LauncherCachedThreadPool {
    static ExecutorService executorService = Executors.newCachedThreadPool();
   public static void main(String[] args) throws IOException, InterruptedException {
