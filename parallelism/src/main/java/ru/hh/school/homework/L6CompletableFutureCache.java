@@ -1,5 +1,6 @@
 package ru.hh.school.homework;
 
+import com.google.common.base.Stopwatch;
 import ru.hh.school.homework.common.CallableNaiveSearchTask;
 
 import java.io.IOException;
@@ -11,9 +12,9 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.lang.System.currentTimeMillis;
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toMap;
@@ -21,7 +22,7 @@ import static java.util.stream.Collectors.toMap;
 // 116613 ms sequential
 // 5173 ms cachedPool
 // 3671 - fixedThreadPool(500) and 116000 ms sequential
-// 3178 - ComputableFutureCache
+// 2725 - ComputableFutureCache
 public class L6CompletableFutureCache {
 
     static ExecutorService executorService = Executors.newFixedThreadPool(500);
@@ -49,15 +50,12 @@ public class L6CompletableFutureCache {
         //
         // Порядок результатов в консоли не обязательный.
         // При желании naiveSearch и naiveCount можно оптимизировать.
-
-        System.out.println(Runtime.getRuntime().availableProcessors());
-        long start = currentTimeMillis();
+        System.out.println("Available processors = " + Runtime.getRuntime().availableProcessors());
+        Stopwatch stopwatch = Stopwatch.createStarted();
         Path rootDirPath = Path.of("D:\\projects\\work\\hh-school\\parallelism\\src\\main\\java\\ru\\hh\\school\\parallelism");
         //Path rootDirPath = Path.of("E:\\GSG\\GRI\\frontend\\src\\");
         try (Stream<Path> stream = Files.walk(rootDirPath)) {
             Stream<Path> directoryStream = stream.filter(Files::isDirectory);
-            long directorySearchDuration = currentTimeMillis() - start;
-            System.out.printf("Directory search is completed in %d ms\r\n", directorySearchDuration);
             directoryStream
                     .forEach(file -> {
                         try {
@@ -66,8 +64,13 @@ public class L6CompletableFutureCache {
                             throw new RuntimeException(e);
                         }
                     });
+            System.out.printf("Directory search is completed in %d ms\r\n", stopwatch.elapsed(MILLISECONDS));
         }
 
+        CompletableFuture<Long>[] results = queriesResults
+                .values()
+                .stream()
+                .toList().toArray(new CompletableFuture[0]);
 
         //вывод повторяющихся запросов
         doubledQueries
@@ -84,15 +87,10 @@ public class L6CompletableFutureCache {
                     }
                 });
 
-        CompletableFuture<Long>[] results = queriesResults
-                .values()
-                .stream()
-                .toList().toArray(new CompletableFuture[0]);
 
         CompletableFuture.allOf(results).get();
         executorService.shutdown();
-        long duration = currentTimeMillis() - start;
-        System.out.printf("The task completed in %d ms", duration);
+        System.out.printf("The task completed in %d ms", stopwatch.elapsed(MILLISECONDS));
     }
 
     private static void directoryCount(Path path) throws InterruptedException {
