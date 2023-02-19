@@ -23,10 +23,10 @@ import static java.util.stream.Collectors.toMap;
 
 // 116613 ms sequential
 // 5173 ms cachedPool
-// 3671 - fixedThreadPool(50) and 116000 ms sequential
+// 3671 - fixedThreadPool(500) and 116000 ms sequential
 public class L5Cache {
 
-    static ExecutorService executorService = Executors.newFixedThreadPool(50);
+    static ExecutorService executorService = Executors.newFixedThreadPool(500);
 
     private static final Map<String, String> doubledQueries = new ConcurrentHashMap<>();
 
@@ -75,7 +75,7 @@ public class L5Cache {
         doubledQueries
                 .entrySet()
                 .stream()
-                .forEach(entry -> System.out.println(entry.getValue() + " - " + CACHE.get(entry.getKey())));
+                .forEach(entry -> System.out.println(entry.getKey() + " - " + CACHE.get(entry.getValue())));
 
         executorService.shutdown();
 
@@ -118,7 +118,7 @@ public class L5Cache {
                     CACHE.put(keyInLowerCase, -2L);
                     executorService.execute(new NaiveSearchTask(key, path));
                 } else {
-                    doubledQueries.put(keyInLowerCase, path + " - " + keyInLowerCase);
+                    doubledQueries.put(path + " - " + keyInLowerCase, keyInLowerCase);
                 }
             });
 
