@@ -20,10 +20,10 @@ import static java.util.stream.Collectors.*;
 
 // 116613 ms sequential
 // 5173 ms cachedPool
-// 3671 - fixedThreadPool(50) and 116000 ms sequential
+// 3671 - fixedThreadPool(500) and 116000 ms sequential
 public class L3FixedThreadPool {
 
-    static ExecutorService executorService = Executors.newFixedThreadPool(50);
+    static ExecutorService executorService = Executors.newFixedThreadPool(500);
     //static ExecutorService executorService = ForkJoinPool.commonPool();
     public static void main(String[] args) throws IOException, InterruptedException {
         // Написать код, который, как можно более параллельно:

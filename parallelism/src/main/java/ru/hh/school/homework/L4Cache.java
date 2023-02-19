@@ -24,7 +24,7 @@ import static java.util.stream.Collectors.toMap;
 
 // 116613 ms sequential
 // 5173 ms cachedPool
-// 3671 - fixedThreadPool(50) and 116000 ms sequential
+// 3671 - fixedThreadPool(500) and 116000 ms sequential
 public class L4Cache {
 
     static ExecutorService executorService = Executors.newFixedThreadPool(50);
