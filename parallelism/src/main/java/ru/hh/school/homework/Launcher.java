@@ -1,6 +1,7 @@
 package ru.hh.school.homework;
 
-import ru.hh.school.homework.common.NaiveSearchTask;
+import com.google.common.base.Stopwatch;
+import ru.hh.school.homework.common.CallableNaiveSearchTask;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,22 +13,26 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.lang.System.currentTimeMillis;
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toMap;
 
-// 9000(mock) ms in one thread and 400 ms using CachedThreadPool
-// 12000(google request) - cached - not optimzied
-// 15496
-// 16268 - fixedThreadPool(500) and 88000 ms sequential
-// 5119 -
+// 116613 ms sequential
+// 5173 ms cachedPool
+// 3671 - fixedThreadPool(500) and 116000 ms sequential
+// 2725 - ComputableFutureCache
 public class Launcher {
-    //static ExecutorService executorService = Executors.newCachedThreadPool();
-    static ExecutorService executorService = Executors.newFixedThreadPool(50);
-    //static ExecutorService executorService = ForkJoinPool.commonPool();
-    public static void main(String[] args) throws IOException, InterruptedException {
+
+    static ExecutorService executorService = Executors.newFixedThreadPool(500);
+
+    private static final Map<String, String> doubledQueries = new ConcurrentHashMap<>();
+
+    private static final Map<String, CompletableFuture<Long>> queriesResults = new ConcurrentHashMap<>();
+
+    public static void main(String[] args) throws IOException, InterruptedException, ExecutionException {
         // Написать код, который, как можно более параллельно:
         // - по заданному пути найдет все "*.java" файлы
         // - для каждого файла вычислит 10 самых популярных слов (см. #naiveCount())
@@ -46,15 +51,12 @@ public class Launcher {
         //
         // Порядок результатов в консоли не обязательный.
         // При желании naiveSearch и naiveCount можно оптимизировать.
-
-        System.out.println(Runtime.getRuntime().availableProcessors());
-        long start = currentTimeMillis();
+        System.out.println("Available processors = " + Runtime.getRuntime().availableProcessors());
+        Stopwatch stopwatch = Stopwatch.createStarted();
         Path rootDirPath = Path.of("D:\\projects\\work\\hh-school\\parallelism\\src\\main\\java\\ru\\hh\\school\\parallelism");
         //Path rootDirPath = Path.of("E:\\GSG\\GRI\\frontend\\src\\");
         try (Stream<Path> stream = Files.walk(rootDirPath)) {
             Stream<Path> directoryStream = stream.filter(Files::isDirectory);
-            long directorySearchDuration = currentTimeMillis() - start;
-            System.out.printf("Directory search is completed in %d ms\r\n", directorySearchDuration);
             directoryStream
                     .forEach(file -> {
                         try {
@@ -63,20 +65,33 @@ public class Launcher {
                             throw new RuntimeException(e);
                         }
                     });
+            System.out.printf("Directory search is completed in %d ms\r\n", stopwatch.elapsed(MILLISECONDS));
         }
 
+        CompletableFuture<Long>[] results = queriesResults
+                .values()
+                .stream()
+                .toList().toArray(new CompletableFuture[0]);
+
+        //вывод повторяющихся запросов
+        doubledQueries
+                .entrySet()
+                .forEach(entry -> {
+                    try {
+                        Long count = queriesResults.get(entry.getValue()).get();
+                        System.out.println(entry.getKey() + " - " + count);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    } catch (ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+
+        CompletableFuture.allOf(results).get();
         executorService.shutdown();
-
-        // waits until all running tasks finish or timeout happens
-        boolean finished = executorService.awaitTermination(50000L, TimeUnit.MILLISECONDS);
-
-        if (!finished) {
-            // interrupts all running threads, still no guarantee that everything finished
-            executorService.shutdownNow();
-        }
-
-        long duration = currentTimeMillis() - start;
-        System.out.printf("The task completed in %d ms", duration);
+        System.out.printf("The task completed in %d ms", stopwatch.elapsed(MILLISECONDS));
     }
 
     private static void directoryCount(Path path) throws InterruptedException {
@@ -98,8 +113,20 @@ public class Launcher {
                     .limit(10)
                     .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
 
-
-            result.forEach((key, value) -> executorService.execute(new NaiveSearchTask(key, path)));
+            // такой кеш работает, дожидаемся когда все потоки сходят в гугл
+            // и выводим повторяющиеся запросы предварительно взяв count от ComputableFuture
+            result.forEach((key, value) -> {
+                String keyInLowerCase = key.toLowerCase();
+                CompletableFuture<Long> count = queriesResults.get(keyInLowerCase);
+                if (count == null) {
+                    queriesResults.put(keyInLowerCase, CompletableFuture.supplyAsync(() -> {
+                        CallableNaiveSearchTask task = new CallableNaiveSearchTask(keyInLowerCase, path);
+                        return task.call();
+                    }, executorService));
+                } else {
+                    doubledQueries.put(path + " - " + keyInLowerCase, keyInLowerCase);
+                }
+            });
 
         } catch (IOException e) {
             System.out.println("It is impossible to get count value form google");
