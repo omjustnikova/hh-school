@@ -19,7 +19,7 @@ import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
 
-//9076 ms
+//116613 ms sequential
 public class L1LauncherSequential {
 
   public static void main(String[] args) throws IOException {

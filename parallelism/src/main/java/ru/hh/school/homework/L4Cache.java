@@ -1,5 +1,6 @@
 package ru.hh.school.homework;
 
+import ru.hh.school.homework.common.CachedNaiveSearchTask;
 import ru.hh.school.homework.common.NaiveSearchTask;
 
 import java.io.IOException;
@@ -7,8 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -17,11 +20,15 @@ import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toMap;
 
-//400 ms
-// CachedThreadPool optimization of google count + directory analyze optimization
-public class L4LauncherCTPDirectoryTask {
-    static ExecutorService executorService = Executors.newCachedThreadPool();
+// 116613 ms sequential
+// 5173 ms cachedPool
+// 3671 - fixedThreadPool(500) and 116000 ms sequential
+public class L4Cache {
+
+    static ExecutorService executorService = Executors.newFixedThreadPool(50);
+
     public static void main(String[] args) throws IOException, InterruptedException {
         // Написать код, который, как можно более параллельно:
         // - по заданному пути найдет все "*.java" файлы
@@ -42,18 +49,15 @@ public class L4LauncherCTPDirectoryTask {
         // Порядок результатов в консоли не обязательный.
         // При желании naiveSearch и naiveCount можно оптимизировать.
 
-
-        // test our naive methods:
+        System.out.println(Runtime.getRuntime().availableProcessors());
         long start = currentTimeMillis();
-        Path rootDirPath = Path.of("d:\\projects\\work\\hh-school\\concurrency\\src");
+        Path rootDirPath = Path.of("D:\\projects\\work\\hh-school\\parallelism\\src\\main\\java\\ru\\hh\\school\\parallelism");
         //Path rootDirPath = Path.of("E:\\GSG\\GRI\\frontend\\src\\");
-        long directorySearchDuration = 0;
         try (Stream<Path> stream = Files.walk(rootDirPath)) {
             Stream<Path> directoryStream = stream.filter(Files::isDirectory);
-            directorySearchDuration = currentTimeMillis() - start;
+            long directorySearchDuration = currentTimeMillis() - start;
             System.out.printf("Directory search is completed in %d ms\r\n", directorySearchDuration);
             directoryStream
-                    .parallel()
                     .forEach(file -> {
                         try {
                             directoryCount(file);
@@ -62,11 +66,11 @@ public class L4LauncherCTPDirectoryTask {
                         }
                     });
         }
-        System.out.printf("Directory processing is completed in %d ms\r\n", currentTimeMillis() - directorySearchDuration - start);
+
         executorService.shutdown();
 
         // waits until all running tasks finish or timeout happens
-        boolean finished = executorService.awaitTermination(10000L, TimeUnit.MILLISECONDS);
+        boolean finished = executorService.awaitTermination(50000L, TimeUnit.MILLISECONDS);
 
         if (!finished) {
             // interrupts all running threads, still no guarantee that everything finished
@@ -78,7 +82,6 @@ public class L4LauncherCTPDirectoryTask {
     }
 
     private static void directoryCount(Path path) throws InterruptedException {
-        long start = currentTimeMillis();
         try (Stream<Path> stream = Files.list(path)) {
 
             Map<String, Long> result = stream
@@ -87,18 +90,18 @@ public class L4LauncherCTPDirectoryTask {
                     .map(file -> naiveCount(file))
                     .map(Map::entrySet)
                     .flatMap(Collection::stream)
-                    .collect(groupingBy(Entry::getKey, summarizingLong(Entry::getValue)))
+                    .collect(groupingBy(Map.Entry::getKey, summarizingLong(Map.Entry::getValue)))
                     .entrySet()
                     .stream()
-                    .collect(Collectors.toMap(Entry::getKey, v -> v.getValue().getSum()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, wordCount -> wordCount.getValue().getSum()))
                     .entrySet()
                     .stream()
                     .sorted(comparingByValue(reverseOrder()))
                     .limit(10)
-                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-            System.out.printf("Directory analyze of %s is completed in %d ms\r\n", path.toString(), currentTimeMillis() - start);
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-            result.forEach((key, value) -> executorService.execute(new NaiveSearchTask(key, path)));
+            // такой кеш не работает, так как к тому времени когда из него пора брать, потоки уже сходили в гугл
+            result.forEach((key, value) -> executorService.execute(new CachedNaiveSearchTask(key, path)));
 
         } catch (IOException e) {
             System.out.println("It is impossible to get count value form google");
@@ -115,11 +118,10 @@ public class L4LauncherCTPDirectoryTask {
                     .stream()
                     .sorted(comparingByValue(reverseOrder()))
                     .limit(10)
-                    .collect(toMap(Entry::getKey, Entry::getValue));
+                    .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
         catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 }
-
